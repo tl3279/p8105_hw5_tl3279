@@ -8,6 +8,8 @@ output: github_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(ggplot2)
+library(dplyr)
+library(readr)
 ```
 
 ## Problem 1
@@ -123,3 +125,64 @@ The sample average of mu across tests where the null is rejected is not approxim
 mu is farther from zero, resulting in an upward bias. As mu increases, the power of the test improves, reducing this bias, and the estimates more closely align with the true mu.
 
 ## Problem 3
+```{r message = FALSE}
+data_url <- "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
+
+homicide_data <- read_csv(data_url)
+```
+The raw data from The Washington Post's homicide dataset contains information on individual homicide cases across 50 large U.S. cities.It has a total of 52179 observations over 12 variables. Each row represents a unique case and includes details such as the date of the homicide, victim demographics (name, race, age, sex, and ethnicity), the disposition of the case (e.g., "Closed by arrest," "Open/No arrest"), and geographic information (city, state, latitude, and longitude). 
+
+Create the city_state variable and analysis
+```{r}
+total_df = 
+  homicide_data |>
+  mutate(
+    city_state = paste(city, state, sep = ","),
+    unsolved = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), 1, 0)
+    ) |>
+  group_by(city_state) |>
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(unsolved)
+  )
+```
+
+Prop.test for Baltimore, MD
+```{r}
+baltimore_test =
+  total_df |>
+  filter(city_state == "Baltimore,MD") |>
+  with(prop.test(unsolved_homicides, total_homicides))
+baltimore_summary = 
+  broom::tidy(baltimore_test) |>
+  select(estimate, conf.low, conf.high)|>
+  print()
+```
+
+Prop.test for all cities
+```{r warning = FALSE}
+city_tests = 
+  total_df |>
+  mutate(
+    test_result = purrr::map2(unsolved_homicides, total_homicides, 
+                       ~prop.test(.x, .y) |> broom::tidy())
+  ) |>
+  unnest(test_result) |>
+  select(city_state, estimate, conf.low, conf.high)
+```
+
+```{r, fig.width=8, fig.height=8}
+city_tests |>
+  arrange(desc(estimate)) |>
+  mutate(city_state = factor(city_state, levels = city_state)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.25, color = "darkgray") +
+  labs(
+    x = "City",
+    y = "Proportion of Unsolved Homicides"
+  ) +
+  coord_flip() +
+  theme_minimal()
+```
+
