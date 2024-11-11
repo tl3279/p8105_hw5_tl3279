@@ -7,6 +7,7 @@ output: github_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(ggplot2)
 ```
 
 ## Problem 1
@@ -41,3 +42,84 @@ sim_res |>
 ```
 The probability of at least two people sharing a birthday increases as the group size grows. The probability starts off close to zero for very small group sizes but increases rapidly. As the group size approaches 23, the  probability increased to about 50%. For larger group sizes, the probability approaches 1, indicating near certainty that at least two people will share a birthday.
 
+## Problem 2
+
+Set up the function
+```{r}
+exp_sim = function(mu) {
+  data = rnorm(30, mean = mu, sd = 5)
+  tidy_result = 
+    broom::tidy(t.test(data, mu = 0)) |>
+    select(estimate, p.value)
+  return(tidy_result)
+}
+
+exp_df = 
+  expand_grid(
+    mu = c(0:6),
+    iter = 1:5000
+  ) |>
+  mutate(result = map(mu, exp_sim)) |>
+  unnest(result)
+```
+
+Power vs true mean plot
+```{r}
+exp_df |>
+  group_by(mu) |>
+  summarize(power = mean(p.value < 0.05)) |>
+  ggplot(aes(x = mu, y = power)) +
+  geom_bar(stat = "identity") +
+  labs(
+    x = "True Value of mu",
+    y = "Power (Proportion of Null Rejections)",
+    title = "Power of the Test vs True Value of mu"
+  ) +
+  theme_minimal()
+```
+
+The plot shows a strong positive association between effect size (true value of mu) and the power of the test. As the effect size increases, the power also increases, indicating a higher probability of correctly rejecting the null hypothesis when it is false. For small effect sizes (e.g., mu = 1), the power is low, meaning there’s a higher chance of failing to detect a true effect. In contrast, for larger effect sizes (e.g., mu = 4 and above), the power approaches 1, meaning the test reliably detects the difference from zero.
+
+Average estimate vs. true mean
+```{r}
+exp_df |>
+  group_by(mu) |>
+  summarize(
+    avg_est = mean(estimate),
+    avg_est_rej = mean(estimate[p.value < 0.05])
+  )|>
+  ggplot(aes(x = mu, y = avg_est)) +
+  geom_line()+
+  labs(
+    x = "True Value of mu",
+    y = "Average Estimate of mu"
+  ) +
+  theme_minimal()
+```
+
+Add the average for rejected to the graph
+```{r}
+exp_df |>
+  group_by(mu) |>
+  summarize(
+  avg_est = mean(estimate),
+  avg_est_rej = mean(estimate[p.value < 0.05])
+  )|>
+  ggplot(aes(x = mu)) +
+  geom_line(aes(y = avg_est, color = "All Samples", linetype = "All Samples"), size = 1) +
+  geom_line(aes(y = avg_est_rej, color = "Rejected Null", linetype = "Rejected Null"), size = 1) +
+  labs(
+    x = "True Value of mu",
+    y = "Average Estimate of mu",
+    color = "Legend", 
+    linetype = "Legend"
+  ) +
+  scale_color_manual(values = c("All Samples" = "blue", "Rejected Null" = "red")) +
+  scale_linetype_manual(values = c("All Samples" = "solid", "Rejected Null" = "dashed")) +
+  theme_minimal() +
+  theme(legend.position = "right")
+```
+The sample average of mu across tests where the null is rejected is not approximately equal to the true value of mu, particularly for smaller mu values. This is due to selection bias: when only considering cases where the null is rejected, we tend to select samples where the observed mean 
+mu is farther from zero, resulting in an upward bias. As mu increases, the power of the test improves, reducing this bias, and the estimates more closely align with the true mu.
+
+## Problem 3
