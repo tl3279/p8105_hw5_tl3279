@@ -71,11 +71,10 @@ exp_df |>
   group_by(mu) |>
   summarize(power = mean(p.value < 0.05)) |>
   ggplot(aes(x = mu, y = power)) +
-  geom_bar(stat = "identity") +
+  geom_line() +
   labs(
     x = "True Value of mu",
-    y = "Power (Proportion of Null Rejections)",
-    title = "Power of the Test vs True Value of mu"
+    y = "Power"
   ) +
   theme_minimal()
 ```
