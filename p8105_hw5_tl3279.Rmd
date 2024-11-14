@@ -42,6 +42,7 @@ sim_res |>
   geom_line() +
   labs(x = "Group Size", y = "Probability of Shared Birthday")
 ```
+
 The probability of at least two people sharing a birthday increases as the group size grows. The probability starts off close to zero for very small group sizes but increases rapidly. As the group size approaches 23, the  probability increased to about 50%. For larger group sizes, the probability approaches 1, indicating near certainty that at least two people will share a birthday.
 
 ## Problem 2
@@ -90,6 +91,7 @@ exp_df |>
     avg_est_rej = mean(estimate[p.value < 0.05])
   )|>
   ggplot(aes(x = mu, y = avg_est)) +
+  geom_point() +
   geom_line()+
   labs(
     x = "True Value of mu",
@@ -99,7 +101,7 @@ exp_df |>
 ```
 
 Add the average for rejected to the graph
-```{r}
+```{r warning = FALSE}
 exp_df |>
   group_by(mu) |>
   summarize(
@@ -120,6 +122,7 @@ exp_df |>
   theme_minimal() +
   theme(legend.position = "right")
 ```
+
 The sample average of mu across tests where the null is rejected is not approximately equal to the true value of mu, particularly for smaller mu values. This is due to selection bias: when only considering cases where the null is rejected, we tend to select samples where the observed mean 
 mu is farther from zero, resulting in an upward bias. As mu increases, the power of the test improves, reducing this bias, and the estimates more closely align with the true mu.
 
@@ -135,10 +138,11 @@ Create the city_state variable and analysis
 ```{r}
 total_df = 
   homicide_data |>
-  mutate(
+    mutate(
     city_state = paste(city, state, sep = ","),
     unsolved = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), 1, 0)
     ) |>
+  filter(!(city_state == "Tulsa,AL")) |>
   group_by(city_state) |>
   summarize(
     total_homicides = n(),
@@ -154,8 +158,8 @@ baltimore_test =
   with(prop.test(unsolved_homicides, total_homicides))
 baltimore_summary = 
   broom::tidy(baltimore_test) |>
-  select(estimate, conf.low, conf.high)|>
-  print()
+  select(estimate, conf.low, conf.high)
+baltimore_summary
 ```
 
 Prop.test for all cities
@@ -168,12 +172,13 @@ city_tests =
   ) |>
   unnest(test_result) |>
   select(city_state, estimate, conf.low, conf.high)
+city_tests
 ```
 
 ```{r, fig.width=8, fig.height=8}
 city_tests |>
   arrange(desc(estimate)) |>
-  mutate(city_state = factor(city_state, levels = city_state)) |>
+  mutate(city_state = fct_reorder(city_state, estimate)) |>
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point() +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.25, color = "darkgray") +
